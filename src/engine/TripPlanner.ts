@@ -1,4 +1,5 @@
 import { Trip, Segment } from '../types/Trip';
+import { GoogleGenAI } from '@google/genai';
 
 export class TripPlanner {
   /**
@@ -9,9 +10,10 @@ export class TripPlanner {
     startDate: string,
     endDate: string,
     budget: number = 1000,
-    purpose: string = 'Culture'
+    purpose: string = 'Culture',
+    isSolo: boolean = false
   ): Promise<Trip> {
-    console.log(`[TripPlanner] Generating trip to ${destination} from ${startDate} to ${endDate} for ${purpose} with budget $${budget}`);
+    console.log(`[TripPlanner] Generating trip to ${destination} from ${startDate} to ${endDate} for ${purpose} with budget $${budget} (Solo: ${isSolo})`);
     
     const start = new Date(startDate).getTime();
     
@@ -69,44 +71,104 @@ export class TripPlanner {
         break;
     }
 
-    const mockSegments: Segment[] = [
-      {
-        segmentId: `flight_${Date.now()}`,
-        type: 'TRANSIT',
-        status: 'UPCOMING',
-        name: `Flight to ${destination}`,
-        cost: budget * 0.3, 
-        startTime: new Date(start).toISOString(),
-        endTime: new Date(start + 18000000).toISOString() // 5 hours flight
-      },
-      {
-        segmentId: `hotel_${Date.now()}`,
-        type: 'LODGING',
-        status: 'UPCOMING',
-        name: hotelName,
-        cost: hotelCost,
-        startTime: new Date(start + 21600000).toISOString(),
-        endTime: new Date(endDate).toISOString()
-      },
-      {
-        segmentId: `exp_${Date.now()}`,
-        type: 'EXPERIENCE',
-        status: 'UPCOMING',
-        name: experienceName,
-        cost: experienceCost,
-        startTime: new Date(start + 86400000).toISOString(), // Next day
-        endTime: new Date(start + 100800000).toISOString() // +4 hours
-      },
-      {
-        segmentId: `dine_${Date.now()}`,
-        type: 'EXPERIENCE',
-        status: 'UPCOMING',
-        name: restaurantName,
-        cost: restaurantCost,
-        startTime: new Date(start + 115200000).toISOString(), // Later that evening
-        endTime: new Date(start + 122400000).toISOString() // +2 hours
+    let mockSegments: Segment[] = [];
+
+    if (process.env.GEMINI_API_KEY) {
+      console.log(`[TripPlanner] Google Gemini AI ACTIVATED. Generating bespoke itinerary...`);
+      try {
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const prompt = `
+          You are an expert travel concierge API. Generate a JSON array of 4 travel itinerary segments for a trip to ${destination}.
+          The total budget is $${budget}. The purpose is ${purpose}. The trip starts around ${startDate} and ends ${endDate}.
+          Return ONLY a raw JSON array (no markdown blocks, no \`\`\`json) of objects matching this exact structure:
+          {
+            "segmentId": "string (unique)",
+            "type": "TRANSIT" | "LODGING" | "EXPERIENCE",
+            "status": "UPCOMING",
+            "name": "string (specific name of hotel/flight/restaurant)",
+            "cost": number (estimated cost in USD),
+            "startTime": "ISO timestamp",
+            "endTime": "ISO timestamp"
+          }
+        `;
+        
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt
+        });
+
+        const rawText = response.text || "[]";
+        const cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        mockSegments = JSON.parse(cleanedText);
+        console.log(`[TripPlanner] Gemini successfully generated ${mockSegments.length} segments!`);
+      } catch (err) {
+        console.error(`[TripPlanner] Gemini AI failed, falling back to heuristic engine.`, err);
       }
-    ];
+    }
+
+    // Fallback if Gemini isn't configured or failed
+    if (mockSegments.length === 0) {
+      mockSegments = [
+        {
+          segmentId: `flight_${Date.now()}`,
+          type: 'TRANSIT',
+          status: 'UPCOMING',
+          name: `Flight to ${destination}`,
+          cost: budget * 0.3, 
+          startTime: new Date(start).toISOString(),
+          endTime: new Date(start + 18000000).toISOString() // 5 hours flight
+        },
+        {
+          segmentId: `hotel_${Date.now()}`,
+          type: 'LODGING',
+          status: 'UPCOMING',
+          name: hotelName,
+          cost: hotelCost,
+          startTime: new Date(start + 21600000).toISOString(),
+          endTime: new Date(endDate).toISOString()
+        },
+        {
+          segmentId: `exp_${Date.now()}`,
+          type: 'EXPERIENCE',
+          status: 'UPCOMING',
+          name: experienceName,
+          cost: experienceCost,
+          startTime: new Date(start + 86400000).toISOString(), // Next day
+          endTime: new Date(start + 100800000).toISOString() // +4 hours
+        },
+        {
+          segmentId: `dine_${Date.now()}`,
+          type: 'EXPERIENCE',
+          status: 'UPCOMING',
+          name: restaurantName,
+          cost: restaurantCost,
+          startTime: new Date(start + 115200000).toISOString(), // Later that evening
+          endTime: new Date(start + 122400000).toISOString() // +2 hours
+        }
+      ];
+    }
+
+    // Solo Traveller Safety Injection
+    const vibesArr = [purpose.toLowerCase()];
+    if (isSolo) {
+      console.log(`[TripPlanner] Solo Traveller Safety Protocols ACTIVATED. Injecting safety segments.`);
+      vibesArr.push('solo-safe');
+      
+      // Inject a Safety Briefing Segment right after hotel check-in
+      mockSegments.splice(2, 0, {
+        segmentId: `safe_${Date.now()}`,
+        type: 'SAFETY' as any, // Mocking a new SAFETY type
+        status: 'UPCOMING',
+        name: `Local Safety Briefing & Emergency Check-in`,
+        cost: 0,
+        startTime: new Date(start + 25200000).toISOString(),
+        endTime: new Date(start + 27000000).toISOString()
+      });
+
+      // Modify the evening dining to include a "Safe Transit" descriptor
+      const lastSegment = mockSegments[mockSegments.length - 1];
+      lastSegment.name = lastSegment.name + ' (Verified Safe Transit)';
+    }
 
     return {
       tripId: `trip_${Date.now()}`,
@@ -115,7 +177,7 @@ export class TripPlanner {
       constraints: {
         budgetMax: budget,
         currency: 'USD',
-        vibes: [purpose.toLowerCase()],
+        vibes: vibesArr,
         mobilityRequirements: []
       },
       schedule: {

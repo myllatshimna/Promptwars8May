@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,7 +16,7 @@
     
     <header class="header glass">
       <div class="logo-container">
-        <svg class="site-logo" viewBox="0 0 24 24" fill="none" stroke="url(#logo-gradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="site-logo" viewBox="0 0 24 24" fill="none" stroke="url(#logo-gradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <defs>
             <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stop-color="#0284c7" />
@@ -62,6 +64,13 @@
             </select>
           </div>
         </div>
+        <div class="form-group toggle-group">
+          <label class="switch">
+            <input type="checkbox" id="solo-traveller">
+            <span class="slider round"></span>
+          </label>
+          <span class="toggle-label">Enable Solo Traveller Safety Protocols</span>
+        </div>
         <button type="submit" class="btn primary" id="btn-generate">
           Generate Itinerary
         </button>
@@ -69,64 +78,110 @@
     </section>
 
     <main class="main-content">
-      <section class="trip-state glass">
-        <h2>Current Trip Itinerary</h2>
-        
-        <div class="metrics">
-          <div class="metric-card">
-            <span class="metric-label">Remaining Budget</span>
-            <span class="metric-value" id="budget-value">$---</span>
+      
+      <!-- Top Row: Map and Stats -->
+      <div class="top-row">
+        <!-- New Map Section (Takes 50% width) -->
+        <section class="map-section glass" aria-label="Interactive Route Map Section" role="region">
+          <h2>Interactive Route Map</h2>
+          <div id="map" class="map-container" style="z-index: 1;" aria-label="Interactive Map" role="application">
+            <!-- Leaflet Map will be rendered here -->
           </div>
-          <div class="metric-card">
-            <span class="metric-label">Active Vibes</span>
-            <span class="metric-value" id="vibes-value">---</span>
-          </div>
-          <div class="metric-card">
-            <span class="metric-label">Connection</span>
-            <span class="metric-value status-indicator" id="ws-status">
-              <span class="dot disconnected"></span> Offline
-            </span>
-          </div>
-        </div>
+        </section>
 
-        <div class="itinerary-timeline" id="itinerary-container">
-          <!-- Segments will be injected here via JS -->
-          <div class="loading-state">Waiting for engine data...</div>
-        </div>
-      </section>
-
-      <!-- New Map Section -->
-      <section class="map-section glass">
-        <h2>Interactive Route Map</h2>
-        <div id="map" class="map-container">
-          <!-- Google Maps will be rendered here -->
-          <div class="loading-state">Loading Google Maps...</div>
-        </div>
-      </section>
-
-      <section class="controls glass">
-        <h2>Simulation Controls</h2>
-        <p class="instruction">Trigger an external event to watch the CSP engine dynamically re-route the itinerary via WebSockets.</p>
-        
-        <div class="button-group">
-          <button id="btn-closure" class="btn danger">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-            Simulate "Louvre" Closure
-          </button>
+        <section class="trip-state glass">
+          <h2>Trip Intelligence</h2>
           
-          <button id="btn-delay" class="btn warning">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            Simulate Flight Delay
-          </button>
-        </div>
+          <div class="metrics">
+            <div class="metric-card">
+              <span class="metric-label">Remaining Budget</span>
+              <span class="metric-value" id="budget-value">$---</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Est. CO2 Footprint</span>
+              <span class="metric-value" id="co2-value" style="color: var(--success);">---</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Dest. Weather</span>
+              <span class="metric-value" id="weather-value">---</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Connection</span>
+              <span class="metric-value status-indicator" id="ws-status">
+                <span class="dot disconnected"></span> Offline
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
 
-        <div class="logs" id="logs-container">
-          <div class="log-entry system">System initialized. Waiting for events...</div>
-        </div>
-      </section>
+      <!-- Bottom Row: Itinerary and Controls -->
+      <div class="bottom-row">
+        <section class="itinerary-section glass" aria-label="Your Itinerary" role="region">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="margin: 0;">Your Bespoke Itinerary</h2>
+            <button id="btn-read-aloud" class="btn primary" style="width: auto; margin: 0; display: none;" aria-label="Read Itinerary Aloud">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+              Read Aloud
+            </button>
+          </div>
+          <div class="itinerary-timeline" id="itinerary-container" aria-live="polite" aria-atomic="false">
+            <!-- Segments will be injected here via JS -->
+            <div class="loading-state">Waiting for engine data...</div>
+          </div>
+        </section>
+
+        <section class="controls glass">
+          <h2>Simulation Controls</h2>
+          <p class="instruction">Trigger an external event to watch the CSP engine dynamically re-route the itinerary via WebSockets.</p>
+          
+          <div class="button-group">
+            <button id="btn-closure" class="btn danger" aria-label="Simulate Venue Closure">
+              <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              Simulate "Louvre" Closure
+            </button>
+            
+            <button id="btn-delay" class="btn warning" aria-label="Simulate Flight Delay">
+              <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              Simulate Flight Delay
+            </button>
+          </div>
+
+          <div class="logs" id="logs-container" aria-live="polite">
+            <div class="log-entry system">System initialized. Waiting for events...</div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Gallery Row -->
+      <div class="gallery-row">
+        <section class="gallery-section glass" aria-label="Destination Photo Gallery" role="region">
+          <h2>Destination Inspiration</h2>
+          <div id="image-gallery" class="image-gallery" aria-live="polite">
+            <div class="loading-state">Generate an itinerary to see destination photos...</div>
+          </div>
+        </section>
+      </div>
     </main>
 
+    <footer class="support-footer glass">
+      <h3>Need Help Planning?</h3>
+      <p>Our expert concierges are available 24/7 to assist with your custom itineraries.</p>
+      <div class="support-links">
+        <a href="mailto:support@kingdomofheaven.travel" class="btn primary" aria-label="Email Support">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          Email Support
+        </a>
+        <a href="tel:+18005550199" class="btn primary outline" aria-label="Call Support Phone Number">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          Call +1 (800) 555-0199
+        </a>
+      </div>
+    </footer>
+
   </div>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="app.js"></script>
 </body>
 </html>

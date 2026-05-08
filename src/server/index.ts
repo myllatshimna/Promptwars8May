@@ -7,6 +7,7 @@ import { Reoptimizer } from '../engine/Reoptimizer';
 import { TripPlanner } from '../engine/TripPlanner';
 import { WebSocketManager } from './WebSocketManager';
 import { Trip, OptimizationEvent } from '../types/Trip';
+import { saveTripToFirestore } from './Firebase';
 
 const app = express();
 const server = http.createServer(app);
@@ -88,6 +89,9 @@ app.post('/api/trigger-event', async (req, res) => {
     // Update our in-memory state
     mockTrip = optimizedTrip;
     
+    // Save to Google Cloud Firestore (if configured)
+    await saveTripToFirestore(mockTrip);
+    
     // Push the updated trip to connected clients
     wsManager.pushTripUpdate('user_1', mockTrip);
     
@@ -100,13 +104,16 @@ app.post('/api/trigger-event', async (req, res) => {
 
 // API endpoint to generate a new trip
 app.post('/api/plan-trip', async (req, res) => {
-  const { destination, startDate, endDate, budget, purpose } = req.body;
+  const { destination, startDate, endDate, budget, purpose, isSolo } = req.body;
   
-  console.log(`\n--- Received Request to Plan Trip to ${destination} for ${purpose} ---`);
+  console.log(`\n--- Received Request to Plan Trip to ${destination} for ${purpose} (Solo: ${isSolo}) ---`);
   
   try {
     // Generate new trip
-    mockTrip = await tripPlanner.generateTrip(destination, startDate, endDate, budget, purpose);
+    mockTrip = await tripPlanner.generateTrip(destination, startDate, endDate, budget, purpose, isSolo);
+    
+    // Save to Google Cloud Firestore (if configured)
+    await saveTripToFirestore(mockTrip);
     
     // Push the new trip to connected clients
     wsManager.pushTripUpdate('user_1', mockTrip);
