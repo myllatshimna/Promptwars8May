@@ -30,7 +30,7 @@ jobs:
       run: npx tsc --noEmit
       
     - name: Run Jest Test Suite
-      run: npm run test -- --forceExit
+      run: npm run test
       env:
         # Mock keys to ensure tests pass without hitting real APIs
         GEMINI_API_KEY: 'ci_mock_key'
