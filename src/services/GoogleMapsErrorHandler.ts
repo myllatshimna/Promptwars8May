@@ -23,7 +23,7 @@ export class GoogleMapsErrorHandler {
       // that falls out of the range of 2xx
       const status = error.response.status;
       const data = error.response.data;
-      
+
       const grpcStatus = data?.error?.status || 'UNKNOWN';
       const message = data?.error?.message || error.message;
       const details = data?.error?.details || [];
@@ -36,7 +36,12 @@ export class GoogleMapsErrorHandler {
         case 404:
           throw new GoogleMapsAPIError(`Resource Not Found: ${message}`, 404, grpcStatus, details);
         case 429:
-          throw new GoogleMapsAPIError(`Rate Limit Exceeded (Resource Exhausted): ${message}`, 429, grpcStatus, details);
+          throw new GoogleMapsAPIError(
+            `Rate Limit Exceeded (Resource Exhausted): ${message}`,
+            429,
+            grpcStatus,
+            details,
+          );
         case 500:
         case 503:
         case 504:

@@ -1,11 +1,11 @@
 import axios, { AxiosInstance } from 'axios';
 import Redis from 'ioredis';
 import dotenv from 'dotenv';
-import { 
-  ComputeRoutesRequest, 
-  ComputeRoutesResponse, 
-  ComputeRouteMatrixRequest, 
-  RouteMatrixElement 
+import {
+  ComputeRoutesRequest,
+  ComputeRoutesResponse,
+  ComputeRouteMatrixRequest,
+  RouteMatrixElement,
 } from '../types/GoogleMaps';
 import { GoogleMapsErrorHandler } from './GoogleMapsErrorHandler';
 
@@ -14,13 +14,13 @@ dotenv.config();
 export class GoogleMapsRoutingService {
   private client: AxiosInstance;
   private redis: Redis | null = null;
-  private memoryCache: Map<string, { value: string, expiresAt: number }> = new Map();
+  private memoryCache: Map<string, { value: string; expiresAt: number }> = new Map();
   private apiKey: string;
   private isMockMode: boolean = false;
 
   constructor() {
     this.apiKey = process.env.GOOGLE_MAPS_API_KEY || '';
-    
+
     if (!this.apiKey) {
       console.warn('[GoogleMapsRoutingService] No GOOGLE_MAPS_API_KEY found in environment. Running in MOCK mode.');
       this.isMockMode = true;
@@ -30,8 +30,8 @@ export class GoogleMapsRoutingService {
       baseURL: 'https://routes.googleapis.com',
       headers: {
         'Content-Type': 'application/json',
-        'X-Goog-Api-Key': this.apiKey
-      }
+        'X-Goog-Api-Key': this.apiKey,
+      },
     });
 
     // Setup Redis or fallback to in-memory cache
@@ -49,17 +49,21 @@ export class GoogleMapsRoutingService {
    */
   public decodePolyline(encoded: string): [number, number][] {
     let points: [number, number][] = [];
-    let index = 0, len = encoded.length;
-    let lat = 0, lng = 0;
+    let index = 0,
+      len = encoded.length;
+    let lat = 0,
+      lng = 0;
 
     while (index < len) {
-      let b, shift = 0, result = 0;
+      let b,
+        shift = 0,
+        result = 0;
       do {
         b = encoded.charAt(index++).charCodeAt(0) - 63;
         result |= (b & 0x1f) << shift;
         shift += 5;
       } while (b >= 0x20);
-      let dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+      let dlat = result & 1 ? ~(result >> 1) : result >> 1;
       lat += dlat;
 
       shift = 0;
@@ -69,7 +73,7 @@ export class GoogleMapsRoutingService {
         result |= (b & 0x1f) << shift;
         shift += 5;
       } while (b >= 0x20);
-      let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+      let dlng = result & 1 ? ~(result >> 1) : result >> 1;
       lng += dlng;
 
       points.push([lat / 1e5, lng / 1e5]);
@@ -112,17 +116,24 @@ export class GoogleMapsRoutingService {
       } catch (error: any) {
         attempt++;
         // Do not retry 4xx errors except 429
-        if (error.response && error.response.status >= 400 && error.response.status < 500 && error.response.status !== 429) {
+        if (
+          error.response &&
+          error.response.status >= 400 &&
+          error.response.status < 500 &&
+          error.response.status !== 429
+        ) {
           GoogleMapsErrorHandler.handleError(error);
         }
         if (attempt >= maxRetries) {
           GoogleMapsErrorHandler.handleError(error);
         }
-        
+
         // Exponential backoff: 1s, 2s, 4s...
         const delayMs = Math.pow(2, attempt) * 500;
-        console.log(`[GoogleMapsRoutingService] Request failed. Retrying in ${delayMs}ms (Attempt ${attempt}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        console.log(
+          `[GoogleMapsRoutingService] Request failed. Retrying in ${delayMs}ms (Attempt ${attempt}/${maxRetries})`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
     throw new Error('Unreachable');
@@ -132,27 +143,29 @@ export class GoogleMapsRoutingService {
    * ComputeRoutes with strict Field Masking and Caching
    */
   public async computeRoutes(
-    requestBody: ComputeRoutesRequest, 
-    computeFuelConsumption: boolean = false
+    requestBody: ComputeRoutesRequest,
+    computeFuelConsumption: boolean = false,
   ): Promise<ComputeRoutesResponse> {
     if (this.isMockMode) {
       // Return a simulated response
       return {
-        routes: [{
-          distanceMeters: 5000,
-          duration: "900s",
-          staticDuration: "800s",
-          polyline: { encodedPolyline: "mock_polyline_data" },
-          travelAdvisory: {
-            fuelConsumptionMicroliters: computeFuelConsumption ? "1500000" : undefined
-          }
-        }]
+        routes: [
+          {
+            distanceMeters: 5000,
+            duration: '900s',
+            staticDuration: '800s',
+            polyline: { encodedPolyline: 'mock_polyline_data' },
+            travelAdvisory: {
+              fuelConsumptionMicroliters: computeFuelConsumption ? '1500000' : undefined,
+            },
+          },
+        ],
       };
     }
 
     const cacheKey = `computeRoutes:${JSON.stringify(requestBody)}:fuel=${computeFuelConsumption}`;
     const cachedData = await this.getCache(cacheKey);
-    
+
     if (cachedData) {
       console.log('[GoogleMapsRoutingService] Serving computeRoutes from cache');
       return JSON.parse(cachedData) as ComputeRoutesResponse;
@@ -164,12 +177,12 @@ export class GoogleMapsRoutingService {
       fieldMask += ',routes.travelAdvisory';
     }
 
-    const response = await this.requestWithRetry(() => 
+    const response = await this.requestWithRetry(() =>
       this.client.post<ComputeRoutesResponse>('/directions/v2:computeRoutes', requestBody, {
         headers: {
-          'X-Goog-FieldMask': fieldMask
-        }
-      })
+          'X-Goog-FieldMask': fieldMask,
+        },
+      }),
     );
 
     // Cache identical requests for 5 minutes
@@ -181,18 +194,18 @@ export class GoogleMapsRoutingService {
   /**
    * ComputeRouteMatrix for evaluating travel times between multiple potential destinations
    */
-  public async computeRouteMatrix(
-    requestBody: ComputeRouteMatrixRequest
-  ): Promise<RouteMatrixElement[]> {
+  public async computeRouteMatrix(requestBody: ComputeRouteMatrixRequest): Promise<RouteMatrixElement[]> {
     if (this.isMockMode) {
       // Mocking matrix evaluation
-      return [{
-        originIndex: 0,
-        destinationIndex: 0,
-        distanceMeters: 1000,
-        duration: "300s",
-        status: { code: 0, message: "OK" }
-      }];
+      return [
+        {
+          originIndex: 0,
+          destinationIndex: 0,
+          distanceMeters: 1000,
+          duration: '300s',
+          status: { code: 0, message: 'OK' },
+        },
+      ];
     }
 
     const cacheKey = `routeMatrix:${JSON.stringify(requestBody)}`;
@@ -205,12 +218,12 @@ export class GoogleMapsRoutingService {
 
     const fieldMask = 'originIndex,destinationIndex,status,duration,distanceMeters,travelAdvisory';
 
-    const response = await this.requestWithRetry(() => 
+    const response = await this.requestWithRetry(() =>
       this.client.post<RouteMatrixElement[]>('/distanceMatrix/v2:computeRouteMatrix', requestBody, {
         headers: {
-          'X-Goog-FieldMask': fieldMask
-        }
-      })
+          'X-Goog-FieldMask': fieldMask,
+        },
+      }),
     );
 
     await this.setCache(cacheKey, JSON.stringify(response.data), 300);

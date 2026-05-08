@@ -1,7 +1,14 @@
-import { Trip, Segment } from '../types/Trip';
 import { GoogleGenAI } from '@google/genai';
+import { Trip, Segment } from '../types/Trip';
+import { GooglePlacesService, PlaceResult } from '../services/GooglePlacesService';
 
 export class TripPlanner {
+  private placesService: GooglePlacesService;
+
+  constructor() {
+    this.placesService = new GooglePlacesService();
+  }
+
   /**
    * Generates a brand new trip based on user constraints.
    */
@@ -11,7 +18,7 @@ export class TripPlanner {
     endDate: string,
     budget: number = 1000,
     purpose: string = 'Culture',
-    isSolo: boolean = false
+    isSolo: boolean = false,
   ): Promise<Trip> {
     // 4. Google API Best Practice: Gemini Prompt Injection Firewall
     if (process.env.GEMINI_API_KEY) {
@@ -25,26 +32,28 @@ export class TripPlanner {
         `;
         const secResponse = await securityAi.models.generateContent({
           model: 'gemini-2.5-flash',
-          contents: securityPrompt
+          contents: securityPrompt,
         });
         const classification = secResponse.text?.trim().toUpperCase();
-        
+
         if (classification?.includes('THREAT')) {
           console.error(`[Security Firewall] 🚨 THREAT DETECTED in payload: ${destination}`);
           throw new Error('SECURITY_THREAT_DETECTED');
         } else {
           console.log(`[Security Firewall] Input classified as SAFE.`);
         }
-      } catch (err: any) {
-        if (err.message === 'SECURITY_THREAT_DETECTED') throw err;
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message === 'SECURITY_THREAT_DETECTED') throw err;
         console.warn(`[Security Firewall] Failed to execute security scan, proceeding cautiously...`);
       }
     }
 
-    console.log(`[TripPlanner] Generating trip to ${destination} from ${startDate} to ${endDate} for ${purpose} with budget $${budget} (Solo: ${isSolo})`);
-    
+    console.log(
+      `[TripPlanner] Generating trip to ${destination} from ${startDate} to ${endDate} for ${purpose} with budget $${budget} (Solo: ${isSolo})`,
+    );
+
     const start = new Date(startDate).getTime();
-    
+
     // Heuristic Recommendation Engine
     let hotelName = `Central Hotel ${destination}`;
     let hotelCost = budget * 0.3;
@@ -100,35 +109,82 @@ export class TripPlanner {
     }
 
     let mockSegments: Segment[] = [];
+    let packingList: string[] = [];
+    let carbonFootprintEstimate: number = 0;
 
     if (process.env.GEMINI_API_KEY) {
       console.log(`[TripPlanner] Google Gemini AI ACTIVATED. Generating bespoke itinerary...`);
       try {
+        // 5. RAG: Fetch Real Google Places to feed into Gemini
+        const realPlaces: PlaceResult[] = await this.placesService.searchTopPlaces(destination, purpose);
+        let placesPromptInjection = '';
+        if (realPlaces.length > 0) {
+          const placesList = realPlaces
+            .map(
+              (p) =>
+                `- ${p.displayName.text} (Rating: ${p.rating}/5, Address: ${p.formattedAddress}, PlaceID: ${p.id})`,
+            )
+            .join('\n');
+          placesPromptInjection = `\nCRITICAL GOOGLE PLACES DATA:\nYou MUST incorporate the following real, highly-rated Google Maps places into the itinerary schedule exactly as they are named:\n${placesList}\nEnsure their 'placeId' property in the JSON matches the provided PlaceID.\n`;
+        }
+
+        const startDateObj = new Date(startDate);
+        const endDateObj = new Date(endDate);
+        const days = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 3600 * 24));
+
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         const prompt = `
-          You are an expert travel concierge API. Generate a JSON array of 4 travel itinerary segments for a trip to ${destination}.
-          The total budget is $${budget}. The purpose is ${purpose}. The trip starts around ${startDate} and ends ${endDate}.
-          Return ONLY a raw JSON array (no markdown blocks, no \`\`\`json) of objects matching this exact structure:
+          You are an expert, high-end travel concierge. 
+          Generate a realistic, detailed JSON itinerary for a trip to ${destination}.
+          Start Date: ${startDate}
+          End Date: ${endDate}
+          Total Duration: ${days} days
+          Total Budget: $${budget} USD
+          Primary Purpose/Vibe: ${purpose}
+          ${placesPromptInjection}
+          
+          Respond ONLY with a valid JSON object matching this structure:
           {
-            "segmentId": "string (unique)",
-            "type": "TRANSIT" | "LODGING" | "EXPERIENCE",
-            "status": "UPCOMING",
-            "name": "string (specific name of hotel/flight/restaurant)",
-            "cost": number (estimated cost in USD),
-            "startTime": "ISO timestamp",
-            "endTime": "ISO timestamp"
+            "itinerary": [
+              {
+                "segmentId": "string (unique)",
+                "type": "LODGING" | "FLIGHT" | "EXPERIENCE" | "DINING" | "TRANSIT",
+                "status": "UPCOMING",
+                "name": "string (name of the place, flight, or hotel)",
+                "placeId": "string (google place id if applicable)",
+                "cost": number (estimated cost in USD),
+                "startTime": "ISO 8601 string",
+                "endTime": "ISO 8601 string"
+              }
+            ],
+            "packingList": [
+              "string (tailored packing item 1)",
+              "string (tailored packing item 2)",
+              "string (tailored packing item 3)"
+            ],
+            "carbonFootprintEstimate": number (estimated carbon footprint in kg CO2)
           }
+          
+          Ensure the itinerary logically flows through the days (don't overlap events), and the total cost stays strictly under the $${budget} budget constraint.
         `;
-        
+
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
-          contents: prompt
+          contents: prompt,
         });
 
-        const rawText = response.text || "[]";
-        const cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-        mockSegments = JSON.parse(cleanedText);
-        console.log(`[TripPlanner] Gemini successfully generated ${mockSegments.length} segments!`);
+        const rawText = response.text || '{}';
+        const cleanedText = rawText
+          .replace(/```json/g, '')
+          .replace(/```/g, '')
+          .trim();
+        const parsedResponse = JSON.parse(cleanedText);
+        mockSegments = parsedResponse.itinerary || [];
+        packingList = parsedResponse.packingList || [];
+        carbonFootprintEstimate = parsedResponse.carbonFootprintEstimate || 0;
+        console.log(
+          `[TripPlanner] Gemini successfully generated ${mockSegments.length} segments, a packing list of ${packingList.length} items, and ${carbonFootprintEstimate}kg CO2 estimate!`,
+        );
       } catch (err) {
         console.error(`[TripPlanner] Gemini AI failed, falling back to heuristic engine.`, err);
       }
@@ -142,9 +198,9 @@ export class TripPlanner {
           type: 'TRANSIT',
           status: 'UPCOMING',
           name: `Flight to ${destination}`,
-          cost: budget * 0.3, 
+          cost: budget * 0.3,
           startTime: new Date(start).toISOString(),
-          endTime: new Date(start + 18000000).toISOString() // 5 hours flight
+          endTime: new Date(start + 18000000).toISOString(), // 5 hours flight
         },
         {
           segmentId: `hotel_${Date.now()}`,
@@ -153,7 +209,7 @@ export class TripPlanner {
           name: hotelName,
           cost: hotelCost,
           startTime: new Date(start + 21600000).toISOString(),
-          endTime: new Date(endDate).toISOString()
+          endTime: new Date(endDate).toISOString(),
         },
         {
           segmentId: `exp_${Date.now()}`,
@@ -162,7 +218,7 @@ export class TripPlanner {
           name: experienceName,
           cost: experienceCost,
           startTime: new Date(start + 86400000).toISOString(), // Next day
-          endTime: new Date(start + 100800000).toISOString() // +4 hours
+          endTime: new Date(start + 100800000).toISOString(), // +4 hours
         },
         {
           segmentId: `dine_${Date.now()}`,
@@ -171,8 +227,8 @@ export class TripPlanner {
           name: restaurantName,
           cost: restaurantCost,
           startTime: new Date(start + 115200000).toISOString(), // Later that evening
-          endTime: new Date(start + 122400000).toISOString() // +2 hours
-        }
+          endTime: new Date(start + 122400000).toISOString(), // +2 hours
+        },
       ];
     }
 
@@ -181,16 +237,16 @@ export class TripPlanner {
     if (isSolo) {
       console.log(`[TripPlanner] Solo Traveller Safety Protocols ACTIVATED. Injecting safety segments.`);
       vibesArr.push('solo-safe');
-      
+
       // Inject a Safety Briefing Segment right after hotel check-in
       mockSegments.splice(2, 0, {
         segmentId: `safe_${Date.now()}`,
-        type: 'SAFETY' as any, // Mocking a new SAFETY type
+        type: 'TRANSIT', // Converted from SAFETY cast since SegmentType doesn't have SAFETY
         status: 'UPCOMING',
         name: `Local Safety Briefing & Emergency Check-in`,
         cost: 0,
         startTime: new Date(start + 25200000).toISOString(),
-        endTime: new Date(start + 27000000).toISOString()
+        endTime: new Date(start + 27000000).toISOString(),
       });
 
       // Modify the evening dining to include a "Safe Transit" descriptor
@@ -206,14 +262,16 @@ export class TripPlanner {
         budgetMax: budget,
         currency: 'USD',
         vibes: vibesArr,
-        mobilityRequirements: []
+        mobilityRequirements: [],
       },
       schedule: {
         startTime: startDate,
-        endTime: endDate
+        endTime: endDate,
       },
       currentLocation: { lat: 0, lng: 0, lastUpdated: new Date().toISOString() }, // Needs Geocoding for real dest
-      itinerary: mockSegments
+      itinerary: mockSegments,
+      packingList,
+      carbonFootprintEstimate,
     };
   }
 }

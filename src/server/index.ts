@@ -5,21 +5,20 @@ import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { z } from 'zod';
-import { Reoptimizer } from '../engine/Reoptimizer';
-import { TripPlanner } from '../engine/TripPlanner';
 import { WebSocketManager } from './WebSocketManager';
-import { Trip, OptimizationEvent } from '../types/Trip';
-import { saveTripToFirestore } from './Firebase';
+import { Trip } from '../types/Trip';
+import tripRoutes from './routes/tripRoutes';
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 // 1. HTTP Header Security
-app.use(helmet({
-  contentSecurityPolicy: false, // Disabled for local dev with inline scripts/styles
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Disabled for local dev with inline scripts/styles
+  }),
+);
 
 app.use(cors());
 app.use(express.json());
@@ -36,9 +35,8 @@ const apiLimiter = rateLimit({
 
 app.use('/api/', apiLimiter);
 
-const reoptimizer = new Reoptimizer();
-const tripPlanner = new TripPlanner();
 const wsManager = new WebSocketManager();
+app.locals.wsManager = wsManager;
 
 // In-memory mock trip
 let mockTrip: Trip = {
@@ -49,11 +47,11 @@ let mockTrip: Trip = {
     budgetMax: 200,
     currency: 'USD',
     vibes: ['museum', 'local_food', 'sightseeing'],
-    mobilityRequirements: []
+    mobilityRequirements: [],
   },
   schedule: {
     startTime: new Date().toISOString(),
-    endTime: new Date(Date.now() + 86400000).toISOString()
+    endTime: new Date(Date.now() + 86400000).toISOString(),
   },
   currentLocation: { lat: 48.8566, lng: 2.3522, lastUpdated: new Date().toISOString() },
   itinerary: [
@@ -65,7 +63,7 @@ let mockTrip: Trip = {
       placeId: 'louvre_123',
       cost: 20,
       startTime: new Date(Date.now() + 3600000).toISOString(),
-      endTime: new Date(Date.now() + 10800000).toISOString()
+      endTime: new Date(Date.now() + 10800000).toISOString(),
     },
     {
       segmentId: 'seg_2',
@@ -75,102 +73,37 @@ let mockTrip: Trip = {
       placeId: 'eiffel_123',
       cost: 30,
       startTime: new Date(Date.now() + 14400000).toISOString(),
-      endTime: new Date(Date.now() + 18000000).toISOString()
-    }
-  ]
+      endTime: new Date(Date.now() + 18000000).toISOString(),
+    },
+  ],
 };
 
 // WebSocket connection handling
 wss.on('connection', (ws) => {
   console.log('New WebSocket connection established');
-  
+
   // For demonstration, we assume all connections belong to 'user_1'
-  wsManager.connect('user_1', ws as any);
+  wsManager.connect('user_1', ws as WebSocket);
 
   // Send the initial trip state on connection
-  ws.send(JSON.stringify({
-    type: 'TRIP_UPDATED',
-    timestamp: new Date().toISOString(),
-    data: mockTrip
-  }));
+  ws.send(
+    JSON.stringify({
+      type: 'TRIP_UPDATED',
+      timestamp: new Date().toISOString(),
+      data: app.locals.mockTrip,
+    }),
+  );
 });
 
-// API endpoint to trigger a real-time event
-app.post('/api/trigger-event', async (req, res) => {
-  const event: OptimizationEvent = req.body;
-  
-  console.log(`\n--- Received Event: ${event.type} ---`);
-  
-  try {
-    // Run the engine
-    const optimizedTrip = await reoptimizer.handleEvent(mockTrip, event);
-    
-    // Update our in-memory state
-    mockTrip = optimizedTrip;
-    
-    // Save to Google Cloud Firestore (if configured)
-    await saveTripToFirestore(mockTrip);
-    
-    // Push the updated trip to connected clients
-    wsManager.pushTripUpdate('user_1', mockTrip);
-    
-    res.json({ success: true, message: 'Trip re-optimized and broadcasted successfully.' });
-  } catch (error) {
-    console.error('Error during re-optimization:', error);
-    res.status(500).json({ success: false, error: 'Failed to re-optimize trip' });
-  }
-});
+app.locals.mockTrip = mockTrip;
 
-// 3. Sensitive Data Path Validation Schema
-const TripRequestSchema = z.object({
-  destination: z.string().min(2).max(100),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
-  budget: z.number().positive().max(100000),
-  purpose: z.string().max(50),
-  isSolo: z.boolean(),
-});
-
-// API endpoint to generate a new trip
-app.post('/api/plan-trip', async (req, res) => {
-  // Validate Request Body Payload
-  const validationResult = TripRequestSchema.safeParse(req.body);
-  if (!validationResult.success) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Invalid Request Payload', 
-      details: validationResult.error.issues 
-    });
-  }
-
-  const { destination, startDate, endDate, budget, purpose, isSolo } = validationResult.data;
-  
-  console.log(`\n--- Received Request to Plan Trip to ${destination} for ${purpose} (Solo: ${isSolo}) ---`);
-  
-  try {
-    // Generate new trip
-    mockTrip = await tripPlanner.generateTrip(destination, startDate, endDate, budget, purpose, isSolo);
-    
-    // Save to Google Cloud Firestore (if configured)
-    await saveTripToFirestore(mockTrip);
-    
-    // Push the new trip to connected clients
-    wsManager.pushTripUpdate('user_1', mockTrip);
-    
-    res.json({ success: true, message: 'New trip generated and broadcasted successfully.' });
-  } catch (error: any) {
-    if (error.message === 'SECURITY_THREAT_DETECTED') {
-      return res.status(403).json({ success: false, error: 'Malicious payload or prompt injection detected. Request blocked by Gemini Security Firewall.' });
-    }
-    console.error('Error during trip generation:', error);
-    res.status(500).json({ success: false, error: 'Failed to generate trip' });
-  }
-});
+// 3. Modular API Routes
+app.use('/api', tripRoutes);
 
 // API endpoint to serve config (like API Keys) to frontend
 app.get('/api/config', (req, res) => {
   res.json({
-    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
   });
 });
 

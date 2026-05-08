@@ -9,12 +9,14 @@ try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+      credential: admin.credential.cert(serviceAccount),
     });
     db = admin.firestore();
     console.log('[Firebase] Successfully connected to Google Cloud Firestore.');
   } else {
-    console.warn('[Firebase] FIREBASE_SERVICE_ACCOUNT not found in environment. Running with in-memory storage fallback.');
+    console.warn(
+      '[Firebase] FIREBASE_SERVICE_ACCOUNT not found in environment. Running with in-memory storage fallback.',
+    );
   }
 } catch (error) {
   console.error('[Firebase] Failed to initialize Firebase:', error);

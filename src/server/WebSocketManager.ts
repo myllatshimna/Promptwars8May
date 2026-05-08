@@ -12,7 +12,9 @@ export class WebSocketManager {
       this.connections.set(userId, []);
     }
     this.connections.get(userId)?.push(connection);
-    console.log(`[WebSocketManager] Client connected for User ID: ${userId}. Total connections: ${this.connections.get(userId)?.length}`);
+    console.log(
+      `[WebSocketManager] Client connected for User ID: ${userId}. Total connections: ${this.connections.get(userId)?.length}`,
+    );
 
     connection.on('close', () => {
       this.disconnect(userId, connection);
@@ -24,7 +26,7 @@ export class WebSocketManager {
    */
   public pushTripUpdate(userId: string, trip: Trip) {
     const userConnections = this.connections.get(userId);
-    
+
     if (!userConnections || userConnections.length === 0) {
       console.log(`[WebSocketManager] No active connections for User ID: ${userId}. Update not sent.`);
       return;
@@ -33,10 +35,10 @@ export class WebSocketManager {
     const payload = JSON.stringify({
       type: 'TRIP_UPDATED',
       timestamp: new Date().toISOString(),
-      data: trip
+      data: trip,
     });
 
-    userConnections.forEach(conn => {
+    userConnections.forEach((conn) => {
       try {
         if (conn.readyState === WebSocket.OPEN) {
           conn.send(payload);
@@ -55,10 +57,12 @@ export class WebSocketManager {
     const userConnections = this.connections.get(userId);
     if (userConnections) {
       this.connections.set(
-        userId, 
-        userConnections.filter(c => c !== connection)
+        userId,
+        userConnections.filter((c) => c !== connection),
       );
-      console.log(`[WebSocketManager] Client disconnected for User ID: ${userId}. Remaining: ${this.connections.get(userId)?.length}`);
+      console.log(
+        `[WebSocketManager] Client disconnected for User ID: ${userId}. Remaining: ${this.connections.get(userId)?.length}`,
+      );
     }
   }
 }

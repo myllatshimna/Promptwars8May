@@ -21,7 +21,7 @@ export interface Segment {
   cost?: number;
   name?: string;
   placeId?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export interface Trip {
@@ -35,10 +35,12 @@ export interface Trip {
   };
   currentLocation: Location;
   itinerary: Segment[];
+  packingList?: string[];
+  carbonFootprintEstimate?: number; // in kg CO2
 }
 
 export interface OptimizationEvent {
   type: 'FLIGHT_DELAY' | 'VENUE_CLOSURE' | 'USER_PREFERENCE_CHANGE' | 'GEOFENCE_TRIGGER';
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   timestamp: string;
 }

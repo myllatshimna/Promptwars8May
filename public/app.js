@@ -35,7 +35,12 @@ function formatTime(isoString) {
   return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// WebSocket Event Listeners
+// Accessibility: Update aria-checked for toggle switch
+document.getElementById('solo-traveller').addEventListener('change', function(e) {
+  this.setAttribute('aria-checked', this.checked ? 'true' : 'false');
+});
+
+// Set up UI Event Listeners
 ws.onopen = () => {
   wsStatus.innerHTML = '<span class="dot connected"></span> Connected';
   addLog('WebSocket connected. Receiving real-time updates...', 'system');

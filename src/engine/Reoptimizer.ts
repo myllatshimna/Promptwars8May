@@ -11,17 +11,17 @@ export class Reoptimizer {
   /**
    * Re-optimizes a trip based on a real-time event.
    * This is the core Constraint Satisfaction Problem (CSP) solver.
-   * 
+   *
    * @param trip The current state of the Trip
    * @param event The event that triggered the re-optimization (e.g., flight delay)
    * @returns A Promise resolving to the newly optimized Trip
    */
   public async handleEvent(trip: Trip, event: OptimizationEvent): Promise<Trip> {
     console.log(`[Reoptimizer] Received event: ${event.type} for trip: ${trip.tripId}`);
-    
+
     // 1. Identify impacted segments based on the event
     const impactedSegments = this.identifyImpactedSegments(trip, event);
-    
+
     if (impactedSegments.length === 0) {
       console.log(`[Reoptimizer] No segments impacted. No re-routing needed.`);
       return trip;
@@ -50,7 +50,7 @@ export class Reoptimizer {
     // Example logic: if a venue closes, find the segment with that venue
     if (event.type === 'VENUE_CLOSURE') {
       const closedPlaceId = event.payload.placeId;
-      trip.itinerary.forEach(segment => {
+      trip.itinerary.forEach((segment) => {
         if (segment.placeId === closedPlaceId && segment.status !== 'COMPLETED') {
           impactedIds.push(segment.segmentId);
         }
@@ -61,7 +61,7 @@ export class Reoptimizer {
     if (event.type === 'GEOFENCE_TRIGGER') {
       // Logic to check distance vs time until next segment
       // Here we mock that the upcoming segment is impacted
-      const nextSegment = trip.itinerary.find(s => s.status === 'UPCOMING');
+      const nextSegment = trip.itinerary.find((s) => s.status === 'UPCOMING');
       if (nextSegment) impactedIds.push(nextSegment.segmentId);
     }
 
@@ -71,11 +71,11 @@ export class Reoptimizer {
       // For boilerplate, we mock a 20% delay detection if event passes delayMinutes
       const originalDurationMinutes = 60; // Mock 1 hour
       const currentDelay = event.payload.delayMinutes || 0;
-      
+
       if (currentDelay / originalDurationMinutes > 0.15) {
         console.log(`[Reoptimizer] Traffic duration increased by >15%. RE-ROUTE_REQUIRED triggered.`);
         // Mark the upcoming segments as impacted
-        const nextSegment = trip.itinerary.find(s => s.status === 'UPCOMING');
+        const nextSegment = trip.itinerary.find((s) => s.status === 'UPCOMING');
         if (nextSegment) impactedIds.push(nextSegment.segmentId);
       }
     }
@@ -84,13 +84,13 @@ export class Reoptimizer {
   }
 
   private dropSegments(trip: Trip, segmentIdsToDrop: string[]): Trip {
-    const newItinerary = trip.itinerary.filter(segment => !segmentIdsToDrop.includes(segment.segmentId));
+    const newItinerary = trip.itinerary.filter((segment) => !segmentIdsToDrop.includes(segment.segmentId));
     return { ...trip, itinerary: newItinerary };
   }
 
   private calculateRemainingBudget(trip: Trip): number {
     const spent = trip.itinerary
-      .filter(s => s.status === 'COMPLETED' || s.status === 'ACTIVE')
+      .filter((s) => s.status === 'COMPLETED' || s.status === 'ACTIVE')
       .reduce((acc, curr) => acc + (curr.cost || 0), 0);
     return trip.constraints.budgetMax - spent;
   }
@@ -101,20 +101,22 @@ export class Reoptimizer {
     return [
       {
         start: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
-        end: new Date(Date.now() + 18000000).toISOString() // 5 hours from now
-      }
+        end: new Date(Date.now() + 18000000).toISOString(), // 5 hours from now
+      },
     ];
   }
 
   private async generateAlternatives(
-    constraints: Trip['constraints'], 
-    budget: number, 
-    slots: Array<{ start: string; end: string }>
+    constraints: Trip['constraints'],
+    budget: number,
+    slots: Array<{ start: string; end: string }>,
   ): Promise<Segment[]> {
     // This is where we would call the GoogleServiceFetcher and Vertex AI.
     // We mock the response to fit within the constraints.
-    console.log(`[Reoptimizer] Generating alternatives for vibes: ${constraints.vibes.join(', ')} with budget $${budget}`);
-    
+    console.log(
+      `[Reoptimizer] Generating alternatives for vibes: ${constraints.vibes.join(', ')} with budget $${budget}`,
+    );
+
     return [
       {
         segmentId: `seg_new_${Date.now()}`,
@@ -124,8 +126,8 @@ export class Reoptimizer {
         placeId: 'ChIJ_mock_place_id_123',
         startTime: slots[0].start,
         endTime: slots[0].end,
-        cost: Math.min(budget, 25.00), // Ensure it fits budget
-      }
+        cost: Math.min(budget, 25.0), // Ensure it fits budget
+      },
     ];
   }
 

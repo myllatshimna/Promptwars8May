@@ -32,7 +32,7 @@ export interface TravelAdvisory {
       currencyCode: string;
       units: string;
       nanos: number;
-    }[]
+    }[];
   };
   speedReadingIntervals?: {
     startPolylinePointIndex: number;

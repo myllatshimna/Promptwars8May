@@ -13,8 +13,10 @@ export class GoogleServiceFetcher {
    */
   public async getRoute(origin: Location, destination: Location, mode: string = 'TRANSIT') {
     // Expected field mask: routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline
-    console.log(`[GoogleServiceFetcher] Fetching route from (${origin.lat}, ${origin.lng}) to (${destination.lat}, ${destination.lng})`);
-    
+    console.log(
+      `[GoogleServiceFetcher] Fetching route from (${origin.lat}, ${origin.lng}) to (${destination.lat}, ${destination.lng})`,
+    );
+
     const requestBody = {
       origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
       destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
@@ -31,18 +33,18 @@ export class GoogleServiceFetcher {
     //   },
     //   body: JSON.stringify(requestBody)
     // });
-    
+
     // Mocking response based on field mask
     return {
       routes: [
         {
-          duration: "1200s",
+          duration: '1200s',
           distanceMeters: 4500,
           polyline: {
-            encodedPolyline: "mock_encoded_polyline_data_here"
-          }
-        }
-      ]
+            encodedPolyline: 'mock_encoded_polyline_data_here',
+          },
+        },
+      ],
     };
   }
 
@@ -53,22 +55,24 @@ export class GoogleServiceFetcher {
    */
   public async fetchPlacesBatch(location: Location, vibes: string[], maxBudget: number) {
     // Field Mask: places.id,places.displayName,places.priceLevel,places.rating
-    console.log(`[GoogleServiceFetcher] Fetching batch places near (${location.lat}, ${location.lng}) matching vibes: ${vibes.join(',')}`);
+    console.log(
+      `[GoogleServiceFetcher] Fetching batch places near (${location.lat}, ${location.lng}) matching vibes: ${vibes.join(',')}`,
+    );
 
     // Mock response representing places API search results
     return [
       {
-        id: "ChIJ_mock_1",
-        displayName: { text: "Cozy Vibe Cafe", languageCode: "en" },
-        priceLevel: "PRICE_LEVEL_MODERATE",
-        rating: 4.8
+        id: 'ChIJ_mock_1',
+        displayName: { text: 'Cozy Vibe Cafe', languageCode: 'en' },
+        priceLevel: 'PRICE_LEVEL_MODERATE',
+        rating: 4.8,
       },
       {
-        id: "ChIJ_mock_2",
-        displayName: { text: "Historical Museum", languageCode: "en" },
-        priceLevel: "PRICE_LEVEL_INEXPENSIVE",
-        rating: 4.5
-      }
+        id: 'ChIJ_mock_2',
+        displayName: { text: 'Historical Museum', languageCode: 'en' },
+        priceLevel: 'PRICE_LEVEL_INEXPENSIVE',
+        rating: 4.5,
+      },
     ];
   }
 }
