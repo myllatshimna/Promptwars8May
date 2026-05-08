@@ -41,24 +41,26 @@ describe('TripPlanner Engine', () => {
     planner = new TripPlanner();
     process.env.GEMINI_API_KEY = 'test_mock_key';
 
-    // Default success behavior
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify({
-        itinerary: [
-          {
-            segmentId: 'mock_ai_1',
-            type: 'LODGING',
-            status: 'UPCOMING',
-            name: 'AI Generated Mock Hotel',
-            cost: 500,
-            startTime: '2026-05-10T15:00:00.000Z',
-            endTime: '2026-05-12T11:00:00.000Z',
-          },
-        ],
-        packingList: ['Sunscreen', 'Walking Shoes'],
-        carbonFootprintEstimate: 350,
-      }),
-    });
+    // Default success behavior: security check returns SAFE, main call returns itinerary object
+    mockGenerateContent
+      .mockResolvedValueOnce({ text: 'SAFE' }) // First call: security firewall
+      .mockResolvedValue({                      // Subsequent calls: itinerary generation
+        text: JSON.stringify({
+          itinerary: [
+            {
+              segmentId: 'mock_ai_1',
+              type: 'LODGING',
+              status: 'UPCOMING',
+              name: 'AI Generated Mock Hotel',
+              cost: 500,
+              startTime: '2026-05-10T15:00:00.000Z',
+              endTime: '2026-05-12T11:00:00.000Z',
+            },
+          ],
+          packingList: ['Sunscreen', 'Walking Shoes'],
+          carbonFootprintEstimate: 350,
+        }),
+      });
   });
 
   afterEach(() => {
@@ -100,10 +102,13 @@ describe('TripPlanner Engine', () => {
   });
 
   it('should gracefully fallback to heuristic mock segments if Gemini throws an error', async () => {
-    // Force the mock to throw an error
+    // Suppress console output — these errors are INTENTIONAL and expected
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Force ALL generateContent calls (security + itinerary) to throw
     mockGenerateContent.mockRejectedValue(new Error('GEMINI_API_ERROR'));
 
-    // Run the engine
     const trip = await planner.generateTrip(
       'Rome',
       '2026-05-10T10:00:00Z',
@@ -113,8 +118,18 @@ describe('TripPlanner Engine', () => {
       false,
     );
 
-    // The engine should catch the error and fallback to exactly 4 heuristic segments
+    // Verify the engine logged the fallback (proves error handling executed correctly)
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[TripPlanner] Gemini AI failed'),
+      expect.any(Error),
+    );
+
+    // The engine should catch the error and produce 4 heuristic fallback segments
     expect(trip.itinerary).toHaveLength(4);
     expect(trip.itinerary[0].name).toContain('Flight to Rome');
+
+    // Restore console back to normal
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 });
