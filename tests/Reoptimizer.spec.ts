@@ -4,6 +4,19 @@ import { Trip, OptimizationEvent } from '../src/types/Trip';
 describe('Reoptimizer Engine', () => {
   let reoptimizer: Reoptimizer;
   let mockTrip: Trip;
+  let consoleWarnSpy: jest.SpyInstance;
+  let consoleLogSpy: jest.SpyInstance;
+
+  beforeAll(() => {
+    // Suppress expected console output so CI doesn't treat warnings as failures
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    consoleWarnSpy.mockRestore();
+    consoleLogSpy.mockRestore();
+  });
 
   beforeEach(() => {
     reoptimizer = new Reoptimizer();

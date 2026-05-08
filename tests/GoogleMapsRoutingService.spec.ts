@@ -14,6 +14,19 @@ import axios from 'axios';
 
 describe('GoogleMapsRoutingService API Mocks', () => {
   let routingService: GoogleMapsRoutingService;
+  let consoleWarnSpy: jest.SpyInstance;
+  let consoleLogSpy: jest.SpyInstance;
+
+  beforeAll(() => {
+    // Suppress expected console output so CI doesn't treat warnings as failures
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    consoleWarnSpy.mockRestore();
+    consoleLogSpy.mockRestore();
+  });
 
   beforeEach(() => {
     routingService = new GoogleMapsRoutingService();
