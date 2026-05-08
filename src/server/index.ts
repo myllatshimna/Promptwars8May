@@ -100,13 +100,13 @@ app.post('/api/trigger-event', async (req, res) => {
 
 // API endpoint to generate a new trip
 app.post('/api/plan-trip', async (req, res) => {
-  const { destination, startDate, endDate, budget } = req.body;
+  const { destination, startDate, endDate, budget, purpose } = req.body;
   
-  console.log(`\n--- Received Request to Plan Trip to ${destination} ---`);
+  console.log(`\n--- Received Request to Plan Trip to ${destination} for ${purpose} ---`);
   
   try {
     // Generate new trip
-    mockTrip = await tripPlanner.generateTrip(destination, startDate, endDate, budget);
+    mockTrip = await tripPlanner.generateTrip(destination, startDate, endDate, budget, purpose);
     
     // Push the new trip to connected clients
     wsManager.pushTripUpdate('user_1', mockTrip);
@@ -116,6 +116,13 @@ app.post('/api/plan-trip', async (req, res) => {
     console.error('Error during trip generation:', error);
     res.status(500).json({ success: false, error: 'Failed to generate trip' });
   }
+});
+
+// API endpoint to serve config (like API Keys) to frontend
+app.get('/api/config', (req, res) => {
+  res.json({
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
+  });
 });
 
 const PORT = process.env.PORT || 3000;

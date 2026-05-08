@@ -3,15 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dynamic Travel Engine Dashboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>Kingdom of Heaven - Travel Concierge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="dashboard-container">
     
     <header class="header glass">
-      <h1>Antigravity Travel Concierge</h1>
+      <div class="logo-container">
+        <svg class="site-logo" viewBox="0 0 24 24" fill="none" stroke="url(#logo-gradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <defs>
+            <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#0284c7" />
+              <stop offset="50%" stop-color="#38bdf8" />
+              <stop offset="100%" stop-color="#818cf8" />
+            </linearGradient>
+          </defs>
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+        </svg>
+        <h1>Kingdom of Heaven</h1>
+      </div>
       <p class="subtitle">Real-time Constraints Satisfaction Engine</p>
     </header>
 
@@ -32,9 +46,21 @@
             <input type="datetime-local" id="end-date" required>
           </div>
         </div>
-        <div class="form-group">
-          <label for="budget">Total Budget ($)</label>
-          <input type="number" id="budget" value="1500" min="100" required>
+        <div class="form-group row">
+          <div class="col">
+            <label for="budget">Total Budget ($)</label>
+            <input type="number" id="budget" value="1500" min="100" required>
+          </div>
+          <div class="col">
+            <label for="purpose">Trip Purpose</label>
+            <select id="purpose" required style="background: rgba(255, 255, 255, 0.8); border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 8px; padding: 0.875rem 1rem; color: var(--text-main); font-family: var(--font-body); font-size: 1rem;">
+              <option value="Culture">Culture & Sightseeing</option>
+              <option value="Foodie">Foodie & Culinary</option>
+              <option value="Luxury">Luxury & Relaxation</option>
+              <option value="Adventure">Adventure & Outdoors</option>
+              <option value="Budget">Budget Backpacking</option>
+            </select>
+          </div>
         </div>
         <button type="submit" class="btn primary" id="btn-generate">
           Generate Itinerary
@@ -66,6 +92,15 @@
         <div class="itinerary-timeline" id="itinerary-container">
           <!-- Segments will be injected here via JS -->
           <div class="loading-state">Waiting for engine data...</div>
+        </div>
+      </section>
+
+      <!-- New Map Section -->
+      <section class="map-section glass">
+        <h2>Interactive Route Map</h2>
+        <div id="map" class="map-container">
+          <!-- Google Maps will be rendered here -->
+          <div class="loading-state">Loading Google Maps...</div>
         </div>
       </section>
 

@@ -1,6 +1,13 @@
 import { Trip, Segment, OptimizationEvent } from '../types/Trip';
+import { GoogleMapsRoutingService } from '../services/GoogleMapsRoutingService';
 
 export class Reoptimizer {
+  private routingService: GoogleMapsRoutingService;
+
+  constructor() {
+    this.routingService = new GoogleMapsRoutingService();
+  }
+
   /**
    * Re-optimizes a trip based on a real-time event.
    * This is the core Constraint Satisfaction Problem (CSP) solver.
@@ -56,6 +63,21 @@ export class Reoptimizer {
       // Here we mock that the upcoming segment is impacted
       const nextSegment = trip.itinerary.find(s => s.status === 'UPCOMING');
       if (nextSegment) impactedIds.push(nextSegment.segmentId);
+    }
+
+    // Adaptive Optimization Trigger: Traffic-aware duration increase > 15%
+    if (event.type === 'TRAFFIC_UPDATE' && event.payload.origin && event.payload.destination) {
+      // In a real scenario, we would call the routing service here
+      // For boilerplate, we mock a 20% delay detection if event passes delayMinutes
+      const originalDurationMinutes = 60; // Mock 1 hour
+      const currentDelay = event.payload.delayMinutes || 0;
+      
+      if (currentDelay / originalDurationMinutes > 0.15) {
+        console.log(`[Reoptimizer] Traffic duration increased by >15%. RE-ROUTE_REQUIRED triggered.`);
+        // Mark the upcoming segments as impacted
+        const nextSegment = trip.itinerary.find(s => s.status === 'UPCOMING');
+        if (nextSegment) impactedIds.push(nextSegment.segmentId);
+      }
     }
 
     return impactedIds;
