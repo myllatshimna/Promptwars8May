@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Travel Engine Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="dashboard-container">
+    
+    <header class="header glass">
+      <h1>Antigravity Travel Concierge</h1>
+      <p class="subtitle">Real-time Constraints Satisfaction Engine</p>
+    </header>
+
+    <section class="planner-section glass">
+      <h2>Plan a New Trip</h2>
+      <form id="trip-form" class="trip-form">
+        <div class="form-group">
+          <label for="destination">Preferred Destination</label>
+          <input type="text" id="destination" placeholder="e.g. Tokyo, Japan" required>
+        </div>
+        <div class="form-group row">
+          <div class="col">
+            <label for="start-date">Start Date</label>
+            <input type="datetime-local" id="start-date" required>
+          </div>
+          <div class="col">
+            <label for="end-date">End Date</label>
+            <input type="datetime-local" id="end-date" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="budget">Total Budget ($)</label>
+          <input type="number" id="budget" value="1500" min="100" required>
+        </div>
+        <button type="submit" class="btn primary" id="btn-generate">
+          Generate Itinerary
+        </button>
+      </form>
+    </section>
+
+    <main class="main-content">
+      <section class="trip-state glass">
+        <h2>Current Trip Itinerary</h2>
+        
+        <div class="metrics">
+          <div class="metric-card">
+            <span class="metric-label">Remaining Budget</span>
+            <span class="metric-value" id="budget-value">$---</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Active Vibes</span>
+            <span class="metric-value" id="vibes-value">---</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Connection</span>
+            <span class="metric-value status-indicator" id="ws-status">
+              <span class="dot disconnected"></span> Offline
+            </span>
+          </div>
+        </div>
+
+        <div class="itinerary-timeline" id="itinerary-container">
+          <!-- Segments will be injected here via JS -->
+          <div class="loading-state">Waiting for engine data...</div>
+        </div>
+      </section>
+
+      <section class="controls glass">
+        <h2>Simulation Controls</h2>
+        <p class="instruction">Trigger an external event to watch the CSP engine dynamically re-route the itinerary via WebSockets.</p>
+        
+        <div class="button-group">
+          <button id="btn-closure" class="btn danger">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            Simulate "Louvre" Closure
+          </button>
+          
+          <button id="btn-delay" class="btn warning">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            Simulate Flight Delay
+          </button>
+        </div>
+
+        <div class="logs" id="logs-container">
+          <div class="log-entry system">System initialized. Waiting for events...</div>
+        </div>
+      </section>
+    </main>
+
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
