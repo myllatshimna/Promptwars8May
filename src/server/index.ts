@@ -83,7 +83,8 @@ wss.on('connection', (ws) => {
   console.log('New WebSocket connection established');
 
   // For demonstration, we assume all connections belong to 'user_1'
-  wsManager.connect('user_1', ws as WebSocket);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  wsManager.connect('user_1', ws as any);
 
   // Send the initial trip state on connection
   ws.send(

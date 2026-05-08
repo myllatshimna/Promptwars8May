@@ -66,11 +66,11 @@ export class Reoptimizer {
     }
 
     // Adaptive Optimization Trigger: Traffic-aware duration increase > 15%
-    if (event.type === 'TRAFFIC_UPDATE' && event.payload.origin && event.payload.destination) {
+    if ((event.type as string) === 'TRAFFIC_UPDATE' && event.payload.origin && event.payload.destination) {
       // In a real scenario, we would call the routing service here
       // For boilerplate, we mock a 20% delay detection if event passes delayMinutes
       const originalDurationMinutes = 60; // Mock 1 hour
-      const currentDelay = event.payload.delayMinutes || 0;
+      const currentDelay = (event.payload.delayMinutes as number) || 0;
 
       if (currentDelay / originalDurationMinutes > 0.15) {
         console.log(`[Reoptimizer] Traffic duration increased by >15%. RE-ROUTE_REQUIRED triggered.`);
